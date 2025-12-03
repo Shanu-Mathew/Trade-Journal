@@ -124,7 +124,7 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
         />
       )}
 
-      <div className="lg:pl-64 pt-16 lg:pt-0">
+      <div className="lg:pl-64 pt-16 lg:pt-0 bg-slate-50 dark:bg-slate-900 min-h-screen">
         <main className="p-4 lg:p-8">
           {children}
         </main>
