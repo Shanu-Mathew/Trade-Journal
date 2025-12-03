@@ -1,0 +1,67 @@
+Build a modern, responsive Trading Journal Web App where users can register and manage multiple accounts. Do not include any mention of API or broker connections.
+Key requirements (concise, ready-to-use):
+
+
+Users can add, edit, delete and fully manage their trades. Trade fields: symbol, instrument type, long/short, quantity/size, entry price, exit price, entry/exit timestamps, fees, commissions, slippage, tags, strategy, notes, screenshots. Support leveraged trades (Forex, margin, futures) with leverage, margin, and position-size fields.
+
+
+Dashboard shows KPIs: win rate, number of trades, total P&L, profit/loss, avg R, expectancy, max drawdown, best/worst day, open P&L. Dashboard includes a quick time-range selector (last 10 days, last week, last month, custom range) and updates KPIs accordingly.
+
+
+Charts and visualizations (time-range selector applies to all charts):
+
+
+Total change in amount after each profit and loss (step/cumulative chart showing balance after every closed trade).
+
+
+Profit & loss by day of week (bar chart: Mon, Tue, Wed, ...).
+
+
+Drawdown chart (peak-to-trough over time).
+
+
+Equity curve (cumulative P&L).
+
+
+P&L distribution histogram.
+
+
+Rolling win-rate line (e.g., 30-trade rolling).
+
+
+Heatmap by weekday and hour.
+
+
+Strategy comparison and symbol leaderboard.
+
+
+Trade scatter (size vs P&L) and position-size vs outcome.
+
+
+Candlestick chart with entry/exit markers when OHLC data is provided by the user.
+
+
+
+
+Filters & controls: filter by account, symbol, strategy, tags, win/loss, P&L range, and date range. Ability to save filter presets.
+
+
+Trade detail page: full metadata, notes, screenshots, edit history and a trade-review checklist.
+
+
+CSV import/export for trades and optional OHLC CSV for candlestick overlays. CSV mapping UI with preview and saved presets.
+
+
+Journals: rich-text/markdown notes, attach images, link to trades.
+
+
+Exports: CSV/Excel trade export and PDF snapshot of KPIs + selected charts for chosen date range.
+
+
+Security & infra: JWT auth, secure password hashing, PostgreSQL DB, file storage for screenshots, input validation, audit logs for edits, GDPR-style data export/delete, and backups.
+
+
+Performance: server-side aggregation to handle 10k+ trades; interactive charts that update quickly for selected time ranges.
+
+
+Keep UI clean, mobile-responsive, with light/dark mode. Provide source code, README, sample CSV templates, and basic tests.

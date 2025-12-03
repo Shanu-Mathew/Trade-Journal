@@ -1,0 +1,7 @@
+symbol,instrument_type,direction,quantity,entry_price,exit_price,entry_time,exit_time,fees,commission,strategy,status
+AAPL,stocks,long,100,150.50,155.25,2024-01-15T09:30:00,2024-01-15T15:30:00,1.50,2.00,Momentum,closed
+TSLA,stocks,short,50,245.80,240.20,2024-01-16T10:00:00,2024-01-16T16:00:00,1.00,1.50,Mean Reversion,closed
+EURUSD,forex,long,10000,1.0850,1.0920,2024-01-17T08:00:00,2024-01-17T14:00:00,0,5.00,Breakout,closed
+BTCUSD,crypto,long,0.5,42000,43500,2024-01-18T12:00:00,2024-01-18T20:00:00,10.00,5.00,Trend Following,closed
+GOOGL,stocks,long,25,140.00,145.50,2024-01-19T09:45:00,2024-01-19T15:30:00,0.75,1.25,Earnings Play,closed
+MSFT,stocks,long,75,380.00,,2024-01-20T10:30:00,,0.50,1.00,Swing Trade,open
