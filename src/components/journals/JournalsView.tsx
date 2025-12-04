@@ -7,7 +7,11 @@ import JournalForm from './JournalForm';
 
 type Journal = Database['public']['Tables']['journals']['Row'];
 
-export default function JournalsView() {
+interface JournalsViewProps {
+  selectedAccountId: string | null;
+}
+
+export default function JournalsView({ selectedAccountId }: JournalsViewProps) {
   const { user } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,19 +19,22 @@ export default function JournalsView() {
   const [editingJournal, setEditingJournal] = useState<Journal | null>(null);
 
   useEffect(() => {
-    if (user) {
+    if (user && selectedAccountId) {
       loadJournals();
     }
-  }, [user]);
+  }, [user, selectedAccountId]);
 
   const loadJournals = async () => {
+    if (!selectedAccountId) return;
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('journals')
         .select('*')
         .eq('user_id', user!.id)
-        .order('created_at', { ascending: false });
+        .eq('account_id', selectedAccountId)
+        .order('entry_date', { ascending: false });
 
       if (error) throw error;
       setJournals(data || []);
@@ -48,9 +55,9 @@ export default function JournalsView() {
 
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { error} = await supabase
           .from('journals')
-          .insert({ ...journalData, user_id: user!.id });
+          .insert({ ...journalData, user_id: user!.id, account_id: selectedAccountId });
 
         if (error) throw error;
       }
@@ -78,6 +85,14 @@ export default function JournalsView() {
       console.error('Error deleting journal:', error);
     }
   };
+
+  if (!selectedAccountId) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500 dark:text-gray-400">Please select an account to view journals</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -149,10 +164,12 @@ export default function JournalsView() {
                 {journal.content.replace(/<[^>]*>/g, '')}
               </p>
               <div className="text-xs text-slate-500 dark:text-slate-500">
-                {new Date(journal.created_at).toLocaleDateString('en-US', {
+                {new Date(journal.entry_date).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
-                  year: 'numeric'
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
                 })}
               </div>
             </div>

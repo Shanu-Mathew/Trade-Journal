@@ -8,7 +8,9 @@ import {
   Moon,
   Sun,
   Menu,
-  X
+  X,
+  Target,
+  Calculator
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -27,6 +29,8 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'trades', name: 'Trades', icon: TrendingUp },
+    { id: 'strategies', name: 'Strategies', icon: Target },
+    { id: 'calculator', name: 'Calculator', icon: Calculator },
     { id: 'journals', name: 'Journals', icon: BookOpen },
     { id: 'settings', name: 'Settings', icon: Settings },
   ];
@@ -38,7 +42,7 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg">
             <TrendingUp className="w-5 h-5 text-white" />
           </div>
-          <span className="font-bold text-slate-900 dark:text-white">Trading Journal</span>
+          <span className="font-bold text-slate-900 dark:text-white">JornalX</span>
         </div>
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -61,8 +65,9 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
               <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-xl">
                 <TrendingUp className="w-6 h-6 text-white" />
               </div>
-              <span className="font-bold text-xl text-slate-900 dark:text-white">Trading Journal</span>
+              <span className="font-bold text-xl text-slate-900 dark:text-white">JornalX</span>
             </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">by AasaInvest</p>
           </div>
 
           <nav className="flex-1 p-4 space-y-1 mt-16 lg:mt-0">

@@ -3,13 +3,17 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { Database } from '../../lib/database.types';
 import { calculateTradeMetrics } from '../../utils/tradeCalculations';
+import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 type Trade = Database['public']['Tables']['trades']['Row'];
 type Account = Database['public']['Tables']['accounts']['Row'];
+type Strategy = Database['public']['Tables']['strategies']['Row'];
 
 interface TradeFormProps {
   trade: Trade | null;
   accounts: Account[];
+  prefilledData?: any;
   onSubmit: (data: any) => void;
   onClose: () => void;
 }
@@ -35,7 +39,12 @@ function localDatetimeInputToIso(localValue?: string | null) {
   return d.toISOString();
 }
 
-export default function TradeForm({ trade, accounts, onSubmit, onClose }: TradeFormProps) {
+export default function TradeForm({ trade, accounts, prefilledData, onSubmit, onClose }: TradeFormProps) {
+  const { user } = useAuth();
+  const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
+  const [isCustomStrategy, setIsCustomStrategy] = useState(false);
+
   const [formData, setFormData] = useState(() => ({
     account_id: trade?.account_id || accounts[0]?.id || '',
     symbol: trade?.symbol || '',
@@ -45,7 +54,6 @@ export default function TradeForm({ trade, accounts, onSubmit, onClose }: TradeF
     leverage: trade?.leverage ?? null,
     entry_price: trade?.entry_price ?? 0,
     exit_price: trade?.exit_price ?? null,
-    // convert any incoming ISO to datetime-local friendly value (no seconds, local)
     entry_timestamp: isoToLocalDatetimeInput(trade?.entry_timestamp) || isoToLocalDatetimeInput(new Date().toISOString()),
     exit_timestamp: isoToLocalDatetimeInput(trade?.exit_timestamp) || '',
     fees: trade?.fees ?? 0,
@@ -57,7 +65,21 @@ export default function TradeForm({ trade, accounts, onSubmit, onClose }: TradeF
     status: trade?.status || 'open',
   }));
 
-  // Keep the form reactive to prop changes (useful when opening modal for edit)
+  useEffect(() => {
+    if (user) {
+      loadStrategies();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (prefilledData) {
+      setFormData(prev => ({
+        ...prev,
+        ...prefilledData,
+      }));
+    }
+  }, [prefilledData]);
+
   useEffect(() => {
     setFormData({
       account_id: trade?.account_id || accounts[0]?.id || '',
@@ -78,8 +100,56 @@ export default function TradeForm({ trade, accounts, onSubmit, onClose }: TradeF
       notes: trade?.notes || '',
       status: trade?.status || 'open',
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trade, accounts]);
+
+  const loadStrategies = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('strategies')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('title');
+
+    if (data) {
+      setStrategies(data);
+    }
+  };
+
+  const handleStrategyChange = (value: string) => {
+    if (value === 'custom') {
+      setIsCustomStrategy(true);
+      setSelectedStrategyId('');
+      setFormData({ ...formData, strategy: '' });
+    } else if (value === '') {
+      setIsCustomStrategy(false);
+      setSelectedStrategyId('');
+      setFormData({ ...formData, strategy: '' });
+    } else {
+      const strategy = strategies.find(s => s.id === value);
+      if (strategy) {
+        setIsCustomStrategy(false);
+        setSelectedStrategyId(value);
+        setFormData({ ...formData, strategy: strategy.title });
+      }
+    }
+  };
+
+  const selectedStrategy = strategies.find(s => s.id === selectedStrategyId);
+
+  const formatStrategyBody = (body: string, isBulleted: boolean) => {
+    if (!body) return null;
+
+    if (isBulleted) {
+      return body.split('\n').filter(line => line.trim()).map((line, i) => (
+        <li key={i} className="ml-4">{line.trim()}</li>
+      ));
+    }
+
+    return body.split('\n').map((line, i) => (
+      <p key={i} className="mb-1 text-sm">{line || '\u00A0'}</p>
+    ));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -360,17 +430,50 @@ export default function TradeForm({ trade, accounts, onSubmit, onClose }: TradeF
             </div>
 
             {/* Strategy */}
-            <div>
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Strategy
               </label>
-              <input
-                type="text"
-                value={formData.strategy}
-                onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+              <select
+                value={isCustomStrategy ? 'custom' : selectedStrategyId}
+                onChange={(e) => handleStrategyChange(e.target.value)}
                 className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                placeholder="Momentum, Breakout, etc."
-              />
+              >
+                <option value="">Select a strategy...</option>
+                {strategies.map((strategy) => (
+                  <option key={strategy.id} value={strategy.id}>
+                    {strategy.title}
+                  </option>
+                ))}
+                <option value="custom">Custom</option>
+              </select>
+
+              {isCustomStrategy && (
+                <input
+                  type="text"
+                  value={formData.strategy}
+                  onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-slate-700 text-slate-900 dark:text-white mt-2"
+                  placeholder="Enter custom strategy name"
+                />
+              )}
+
+              {selectedStrategy && !isCustomStrategy && (
+                <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Strategy Details:</p>
+                  <div className="text-slate-700 dark:text-slate-300">
+                    {selectedStrategy.is_bulleted ? (
+                      <ul className="list-disc space-y-1">
+                        {formatStrategyBody(selectedStrategy.body, true)}
+                      </ul>
+                    ) : (
+                      <div className="whitespace-pre-wrap">
+                        {formatStrategyBody(selectedStrategy.body, false)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tags */}

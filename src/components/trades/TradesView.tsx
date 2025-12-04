@@ -12,7 +12,12 @@ import CSVImportModal from './CSVImportModal';
 type Trade = Database['public']['Tables']['trades']['Row'];
 type Account = Database['public']['Tables']['accounts']['Row'];
 
-export default function TradesView() {
+interface TradesViewProps {
+  prefilledData?: any;
+  onDataUsed?: () => void;
+}
+
+export default function TradesView({ prefilledData, onDataUsed }: TradesViewProps = {}) {
   const { user } = useAuth();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -30,6 +35,12 @@ export default function TradesView() {
       loadData();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (prefilledData) {
+      setShowForm(true);
+    }
+  }, [prefilledData]);
 
   const loadData = async () => {
     try {
@@ -317,10 +328,12 @@ export default function TradesView() {
         <TradeForm
           trade={editingTrade}
           accounts={accounts}
+          prefilledData={prefilledData}
           onSubmit={handleTradeSubmit}
           onClose={() => {
             setShowForm(false);
             setEditingTrade(null);
+            if (onDataUsed) onDataUsed();
           }}
         />
       )}

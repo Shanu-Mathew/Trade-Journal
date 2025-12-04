@@ -76,14 +76,42 @@ export interface Database {
         Row: {
           id: string;
           user_id: string;
+          account_id: string | null;
+          folder_id: string | null;
           title: string;
           content: string;
           linked_trade_ids: string[];
+          entry_date: string;
           created_at: string;
           updated_at: string;
         };
         Insert: Omit<Database['public']['Tables']['journals']['Row'], 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Database['public']['Tables']['journals']['Insert']>;
+      };
+      strategies: {
+        Row: {
+          id: string;
+          user_id: string;
+          account_id: string;
+          title: string;
+          body: string;
+          is_bulleted: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['strategies']['Row'], 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Database['public']['Tables']['strategies']['Insert']>;
+      };
+      journal_folders: {
+        Row: {
+          id: string;
+          user_id: string;
+          account_id: string;
+          name: string;
+          created_at: string;
+        };
+        Insert: Omit<Database['public']['Tables']['journal_folders']['Row'], 'id' | 'created_at'>;
+        Update: Partial<Database['public']['Tables']['journal_folders']['Insert']>;
       };
       journal_attachments: {
         Row: {
