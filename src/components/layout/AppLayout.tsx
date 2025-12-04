@@ -39,9 +39,11 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-lg">
-            <TrendingUp className="w-5 h-5 text-white" />
-          </div>
+          <img
+            src="/whatsapp_image_2025-12-04_at_05.54.08_7e174c9e.jpg"
+            alt="JornalX Logo"
+            className="w-8 h-8 object-contain"
+          />
           <span className="font-bold text-slate-900 dark:text-white">JornalX</span>
         </div>
         <button
@@ -62,9 +64,11 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
         <div className="flex flex-col h-full">
           <div className="p-6 border-b border-slate-200 dark:border-slate-700 hidden lg:block">
             <div className="flex items-center gap-3">
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-2 rounded-xl">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
+              <img
+                src="/whatsapp_image_2025-12-04_at_05.54.08_7e174c9e.jpg"
+                alt="JornalX Logo"
+                className="w-10 h-10 object-contain"
+              />
               <span className="font-bold text-xl text-slate-900 dark:text-white">JornalX</span>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">by AasaInvest</p>
