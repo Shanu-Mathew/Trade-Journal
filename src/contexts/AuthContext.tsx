@@ -26,11 +26,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      })();
+      setSession((prevSession) => {
+        if (prevSession?.access_token !== session?.access_token) {
+          return session;
+        }
+        return prevSession;
+      });
+      setUser((prevUser) => {
+        if (prevUser?.id !== session?.user?.id) {
+          return session?.user ?? null;
+        }
+        return prevUser;
+      });
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
