@@ -1,3 +1,4 @@
+// SettingsView.tsx
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -5,10 +6,12 @@ import { Database } from '../../lib/database.types';
 import { Plus, Edit2, Trash2, Loader2 } from 'lucide-react';
 
 type Account = Database['public']['Tables']['accounts']['Row'];
+type Trade = Database['public']['Tables']['trades']['Row'];
 
 export default function SettingsView() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -23,19 +26,33 @@ export default function SettingsView() {
     if (user) {
       loadAccounts();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const loadAccounts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setAccounts(data || []);
+      // Fetch accounts and closed trades (closed trades affect current balance)
+      const [accountsRes, tradesRes] = await Promise.all([
+        supabase
+          .from('accounts')
+          .select('*')
+          .eq('user_id', user!.id)
+          .order('created_at', { ascending: false }),
+
+        supabase
+          .from('trades')
+          .select('*')
+          .eq('user_id', user!.id)
+          .in('status', ['closed']) // only closed trades contribute to realized P&L
+      ]);
+
+      if (accountsRes.error) throw accountsRes.error;
+      if (tradesRes.error) throw tradesRes.error;
+
+      setAccounts(accountsRes.data || []);
+      setTrades(tradesRes.data || []);
     } catch (error) {
       console.error('Error loading accounts:', error);
     } finally {
@@ -95,6 +112,29 @@ export default function SettingsView() {
       await loadAccounts();
     } catch (error) {
       console.error('Error deleting account:', error);
+    }
+  };
+
+  // Helper: sum closed trade P&L for an account and add to initial balance
+  const getCurrentBalance = (accountId: string, initial: number) => {
+    const plSum = trades
+      .filter(t => t.account_id === accountId)
+      .reduce((sum, t) => sum + (t.profit_loss ?? 0), 0);
+
+    return initial + plSum;
+  };
+
+  const formatCurrency = (value: number | null | undefined, currency = 'USD') => {
+    if (value === null || value === undefined) return '-';
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency,
+        minimumFractionDigits: 2,
+      }).format(value);
+    } catch {
+      // fallback
+      return `${currency} ${Number(value).toFixed(2)}`;
     }
   };
 
@@ -241,15 +281,25 @@ export default function SettingsView() {
                 </button>
               </div>
             </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600 dark:text-slate-400">Currency</span>
                 <span className="font-semibold text-slate-900 dark:text-white">{account.currency}</span>
               </div>
+
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-600 dark:text-slate-400">Initial Balance</span>
                 <span className="font-semibold text-slate-900 dark:text-white">
-                  ${Number(account.initial_balance).toFixed(2)}
+                  {formatCurrency(Number(account.initial_balance), account.currency || 'USD')}
+                </span>
+              </div>
+
+              {/* Current Balance (added) */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">Current Balance</span>
+                <span className="font-semibold text-slate-900 dark:text-white">
+                  {formatCurrency(getCurrentBalance(account.id, Number(account.initial_balance)), account.currency || 'USD')}
                 </span>
               </div>
             </div>

@@ -29,7 +29,7 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
   const navigation = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'trades', name: 'Trades', icon: TrendingUp },
-    { id: 'strategies', name: 'Strategies', icon: Target },
+    { id: 'strategies', name: 'Trade Setup', icon: Target },
     { id: 'calculator', name: 'Calculator', icon: Calculator },
     { id: 'journals', name: 'Journals', icon: BookOpen },
     { id: 'settings', name: 'Settings', icon: Settings },
@@ -40,9 +40,9 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <img
-            src="/whatsapp_image_2025-12-04_at_05.54.08_7e174c9e.jpg"
+            src="/logo.png"
             alt="JornalX Logo"
-            className="w-8 h-8 object-contain"
+            className="w-14 h-14 object-contain"
           />
           <span className="font-bold text-slate-900 dark:text-white">JornalX</span>
         </div>
@@ -65,9 +65,9 @@ export default function AppLayout({ children, currentView, onViewChange }: AppLa
           <div className="p-6 border-b border-slate-200 dark:border-slate-700 hidden lg:block">
             <div className="flex items-center gap-3">
               <img
-                src="/whatsapp_image_2025-12-04_at_05.54.08_7e174c9e.jpg"
+                src="/logo.png"
                 alt="JornalX Logo"
-                className="w-10 h-10 object-contain"
+                className="w-16 h-16 object-contain"
               />
               <span className="font-bold text-xl text-slate-900 dark:text-white">JornalX</span>
             </div>

@@ -1,4 +1,4 @@
-// TradesView.tsx (updated)
+// TradesView.tsx (fixed date-range filtering)
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -34,6 +34,7 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
     if (user) {
       loadData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
@@ -135,7 +136,7 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
     }
   };
 
-  // NEW: delete all trades for this user
+  // delete all trades for this user
   const handleDeleteAll = async () => {
     if (trades.length === 0) {
       alert('No trades to delete.');
@@ -148,7 +149,7 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
     try {
       setDeletingAll(true);
 
-      // First fetch the current trades (snapshot) in case UI list is filtered
+      // snapshot
       const { data: currentTrades, error: fetchErr } = await supabase
         .from('trades')
         .select('*')
@@ -156,7 +157,7 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
 
       if (fetchErr) throw fetchErr;
 
-      // Delete all trades for this user
+      // delete
       const { error: deleteErr } = await supabase
         .from('trades')
         .delete()
@@ -164,7 +165,6 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
 
       if (deleteErr) throw deleteErr;
 
-      // Insert a single audit log row recording the bulk delete and include the deleted trades snapshot
       await supabase.from('audit_logs').insert({
         user_id: user!.id,
         entity_type: 'trade',
@@ -182,16 +182,65 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
     }
   };
 
+  // ---------------------------
+  // Date range handling helper
+  // ---------------------------
+  const parseFilterDates = (filtersObj: any): { fromDate: Date | null; toDate: Date | null } => {
+    let from: Date | null = null;
+    let to: Date | null = null;
+
+    // filters.fromDate and filters.toDate are expected to be 'YYYY-MM-DD' strings from input[type=date]
+    if (filtersObj?.fromDate) {
+      // start of day (local)
+      from = new Date(filtersObj.fromDate + 'T00:00:00');
+      if (Number.isNaN(from.getTime())) from = null;
+    }
+    if (filtersObj?.toDate) {
+      // end of day (local) inclusive
+      to = new Date(filtersObj.toDate + 'T23:59:59.999');
+      if (Number.isNaN(to.getTime())) to = null;
+    }
+
+    return { fromDate: from, toDate: to };
+  };
+
+  // ---------------------------
+  // Filtering logic (including date range)
+  // ---------------------------
+  const { fromDate: parsedFromDate, toDate: parsedToDate } = parseFilterDates(filters);
+
   const filteredTrades = trades.filter(trade => {
+    // Search (symbol)
     if (searchTerm && !trade.symbol.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
+
+    // Account, status, direction, strategy
     if (filters.accountId && trade.account_id !== filters.accountId) return false;
     if (filters.status && trade.status !== filters.status) return false;
     if (filters.direction && trade.direction !== filters.direction) return false;
     if (filters.strategy && trade.strategy !== filters.strategy) return false;
-    if (filters.minPL !== undefined && (trade.profit_loss ?? 0) < filters.minPL) return false;
-    if (filters.maxPL !== undefined && (trade.profit_loss ?? 0) > filters.maxPL) return false;
+
+    // P&L min/max
+    if (filters.minPL !== undefined && filters.minPL !== '' && (trade.profit_loss ?? 0) < filters.minPL) return false;
+    if (filters.maxPL !== undefined && filters.maxPL !== '' && (trade.profit_loss ?? 0) > filters.maxPL) return false;
+
+    // Date range: compare against entry_timestamp (if you want exit_timestamp instead, change accordingly)
+    if (parsedFromDate || parsedToDate) {
+      if (!trade.entry_timestamp) {
+        // if trade has no entry timestamp, exclude it when a date filter is present
+        return false;
+      }
+      const entryDate = new Date(trade.entry_timestamp);
+      if (Number.isNaN(entryDate.getTime())) {
+        // invalid date stored - exclude
+        return false;
+      }
+
+      if (parsedFromDate && entryDate < parsedFromDate) return false;
+      if (parsedToDate && entryDate > parsedToDate) return false;
+    }
+
     return true;
   });
 
@@ -267,20 +316,20 @@ export default function TradesView({ prefilledData, onDataUsed }: TradesViewProp
           </button>
 
           <button
-                onClick={handleDeleteAll}
-                disabled={deletingAll}
-                className="
-                  flex items-center gap-2 px-4 py-2
-                  bg-red-500 text-white 
-                  rounded-lg
-                  hover:bg-red-800
-                  disabled:opacity-60 disabled:cursor-not-allowed
-                  transition-colors
-                "
-              >
-                <Trash className="w-4 h-4" />
-                {deletingAll ? 'Deleting...' : 'Delete All'}
-              </button>
+            onClick={handleDeleteAll}
+            disabled={deletingAll}
+            className="
+              flex items-center gap-2 px-4 py-2
+              bg-red-500 text-white
+              rounded-lg
+              hover:bg-red-800
+              disabled:opacity-60 disabled:cursor-not-allowed
+              transition-colors
+            "
+          >
+            <Trash className="w-4 h-4" />
+            {deletingAll ? 'Deleting...' : 'Delete All'}
+          </button>
 
           <button
             onClick={() => {

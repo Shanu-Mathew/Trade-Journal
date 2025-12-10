@@ -1,4 +1,7 @@
+import { useState, useMemo } from 'react';
 import { Database } from '../../lib/database.types';
+import ChartTooltip from './ChartTooltip';
+import ChartInfoButton from './ChartInfoButton';
 
 type Trade = Database['public']['Tables']['trades']['Row'];
 
@@ -7,21 +10,45 @@ interface PLByDayOfWeekChartProps {
 }
 
 export default function PLByDayOfWeekChart({ trades }: PLByDayOfWeekChartProps) {
-  const closedTrades = trades.filter(t => t.status === 'closed' && t.profit_loss !== null);
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const dayPL = new Array(7).fill(0);
+  const dayData = useMemo(() => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayStats = days.map((name, index) => ({
+      name,
+      shortName: name.slice(0, 3),
+      index,
+      totalPL: 0,
+      tradeCount: 0,
+      winCount: 0,
+    }));
 
-  closedTrades.forEach(trade => {
-    const date = new Date(trade.exit_timestamp ?? trade.entry_timestamp);
-    const dayIndex = date.getDay();
-    dayPL[dayIndex] += trade.profit_loss ?? 0;
-  });
+    trades
+      .filter(t => t.status === 'closed' && t.profit_loss !== null)
+      .forEach(trade => {
+        const date = new Date(trade.exit_timestamp ?? trade.entry_timestamp);
+        const dayIndex = date.getDay();
+        dayStats[dayIndex].totalPL += trade.profit_loss ?? 0;
+        dayStats[dayIndex].tradeCount++;
+        if ((trade.profit_loss ?? 0) > 0) {
+          dayStats[dayIndex].winCount++;
+        }
+      });
 
-  if (closedTrades.length === 0) {
+    return dayStats;
+  }, [trades]);
+
+  if (dayData.every(d => d.tradeCount === 0)) {
     return (
       <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">P&L by Day of Week</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">P/L by Day of Week</h3>
+          <ChartInfoButton
+            title="P/L by Day of Week"
+            description="Shows your profit/loss performance for each day of the week. Identify which days are most profitable for your trading strategy."
+          />
+        </div>
         <div className="flex items-center justify-center h-64 text-slate-500 dark:text-slate-400">
           No closed trades yet
         </div>
@@ -29,64 +56,115 @@ export default function PLByDayOfWeekChart({ trades }: PLByDayOfWeekChartProps) 
     );
   }
 
-  const maxAbsPL = Math.max(...dayPL.map(Math.abs), 1);
-  const chartHeight = 300;
-  const barWidth = 60;
-  const gap = 20;
+  const maxAbsPL = Math.max(...dayData.map(d => Math.abs(d.totalPL)), 1);
+  const chartHeight = 240;
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700">
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">P&L by Day of Week</h3>
-      <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${(barWidth + gap) * 7 + gap} ${chartHeight}`} className="w-full h-64">
-          {dayPL.map((pl, index) => {
-            const barHeight = Math.abs(pl) / maxAbsPL * (chartHeight / 2 - 20);
-            const x = gap + index * (barWidth + gap);
-            const y = pl >= 0 ? chartHeight / 2 - barHeight : chartHeight / 2;
-            const color = pl >= 0 ? 'rgb(34, 197, 94)' : 'rgb(239, 68, 68)';
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">P/L by Day of Week</h3>
+        <ChartInfoButton
+          title="P/L by Day of Week"
+          description="Shows your profit/loss performance for each day of the week. Identify which days are most profitable for your trading strategy."
+        />
+      </div>
+
+      <div className="relative" style={{ height: `${chartHeight}px` }}>
+        <div className="absolute inset-x-0 top-1/2 h-px bg-slate-300 dark:bg-slate-600" />
+
+        <div className="flex items-end justify-around h-full gap-2 px-4">
+          {dayData.map((day) => {
+            const heightPercent = (Math.abs(day.totalPL) / maxAbsPL) * 45;
+            const isPositive = day.totalPL >= 0;
+            const isHovered = hoveredDay === day.index;
 
             return (
-              <g key={index}>
-                <rect
-                  x={x}
-                  y={y}
-                  width={barWidth}
-                  height={barHeight}
-                  fill={color}
-                  rx="4"
-                  className="hover:opacity-80 transition-opacity cursor-pointer"
-                >
-                  <title>{`${dayNames[index]}: $${pl.toFixed(2)}`}</title>
-                </rect>
-                <text
-                  x={x + barWidth / 2}
-                  y={chartHeight - 5}
-                  textAnchor="middle"
-                  className="text-xs fill-slate-600 dark:fill-slate-400"
-                >
-                  {dayNames[index].slice(0, 3)}
-                </text>
-                <text
-                  x={x + barWidth / 2}
-                  y={pl >= 0 ? y - 5 : y + barHeight + 15}
-                  textAnchor="middle"
-                  className="text-xs fill-slate-700 dark:fill-slate-300 font-semibold"
-                >
-                  ${pl.toFixed(0)}
-                </text>
-              </g>
+              <div
+                key={day.index}
+                className="flex flex-col items-center flex-1 cursor-pointer"
+                style={{ height: '100%' }}
+                onMouseEnter={(e) => {
+                  setHoveredDay(day.index);
+                  setMousePos({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseMove={(e) => {
+                  setMousePos({ x: e.clientX, y: e.clientY });
+                }}
+                onMouseLeave={() => setHoveredDay(null)}
+              >
+                <div className="flex-1 flex flex-col justify-center items-center w-full">
+                  {isPositive ? (
+                    <div
+                      className={`w-full rounded-t-lg transition-all duration-300 ${
+                        isHovered
+                          ? 'bg-green-500 dark:bg-green-500 shadow-lg'
+                          : 'bg-green-400 dark:bg-green-600'
+                      }`}
+                      style={{
+                        height: `${heightPercent}%`,
+                        opacity: isHovered ? 1 : 0.9,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      className={`w-full rounded-b-lg transition-all duration-300 ${
+                        isHovered
+                          ? 'bg-red-500 dark:bg-red-500 shadow-lg'
+                          : 'bg-red-400 dark:bg-red-600'
+                      }`}
+                      style={{
+                        height: `${heightPercent}%`,
+                        opacity: isHovered ? 1 : 0.9,
+                        marginTop: 'auto',
+                      }}
+                    />
+                  )}
+                </div>
+
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-400 mt-2">
+                  {day.shortName}
+                </div>
+              </div>
             );
           })}
-          <line
-            x1="0"
-            y1={chartHeight / 2}
-            x2={(barWidth + gap) * 7 + gap}
-            y2={chartHeight / 2}
-            stroke="rgb(148, 163, 184)"
-            strokeWidth="1"
-            strokeDasharray="4"
-          />
-        </svg>
+        </div>
+      </div>
+
+      {hoveredDay !== null && (
+        <ChartTooltip x={mousePos.x} y={mousePos.y} visible={true}>
+          <div className="space-y-1">
+            <div className="font-semibold">{dayData[hoveredDay].name}</div>
+            <div className={dayData[hoveredDay].totalPL >= 0 ? 'text-green-400' : 'text-red-400'}>
+              Total P/L: {dayData[hoveredDay].totalPL >= 0 ? '+' : ''}${dayData[hoveredDay].totalPL.toFixed(2)}
+            </div>
+            <div className="text-slate-300">
+              Trades: {dayData[hoveredDay].tradeCount}
+            </div>
+            <div className="text-slate-300">
+              Win Rate: {dayData[hoveredDay].tradeCount > 0
+                ? ((dayData[hoveredDay].winCount / dayData[hoveredDay].tradeCount) * 100).toFixed(1)
+                : 0}%
+            </div>
+            <div className="text-slate-300">
+              Avg P/L: ${dayData[hoveredDay].tradeCount > 0
+                ? (dayData[hoveredDay].totalPL / dayData[hoveredDay].tradeCount).toFixed(2)
+                : '0.00'}
+            </div>
+          </div>
+        </ChartTooltip>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
+        <div className="text-slate-600 dark:text-slate-400">
+          Best Day: <span className="font-semibold text-green-600 dark:text-green-400">
+            {dayData.reduce((best, day) => day.totalPL > best.totalPL ? day : best).name}
+          </span>
+        </div>
+        <div className="text-slate-600 dark:text-slate-400">
+          Worst Day: <span className="font-semibold text-red-600 dark:text-red-400">
+            {dayData.reduce((worst, day) => day.totalPL < worst.totalPL ? day : worst).name}
+          </span>
+        </div>
       </div>
     </div>
   );

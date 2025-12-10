@@ -7,21 +7,23 @@ interface CalculatorViewProps {
   onSendToTradeForm?: (tradeData: any) => void;
 }
 
+const UNITS_PER_LOT = 100;
+
 export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm }: CalculatorViewProps) {
   const [entry, setEntry] = useState<string>('');
   const [stopLoss, setStopLoss] = useState<string>('');
   const [riskPercent, setRiskPercent] = useState<string>('2');
   const [rewardRatio, setRewardRatio] = useState<string>('2');
   const [direction, setDirection] = useState<'long' | 'short'>('long');
-  const [allowFractional, setAllowFractional] = useState(false);
+  const [allowFractional, setAllowFractional] = useState(true);
   const [principal, setPrincipal] = useState<number>(0);
+  const [valuePerPoint, setValuePerPoint] = useState<string>('1');
+  const [leverage, setLeverage] = useState<string>('1');
 
   useEffect(() => {
     if (selectedAccountId) {
       const account = accounts.find(a => a.id === selectedAccountId);
-      if (account) {
-        setPrincipal(account.initial_balance);
-      }
+      if (account) setPrincipal(account.initial_balance);
     }
   }, [selectedAccountId, accounts]);
 
@@ -30,37 +32,51 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
     const slPrice = parseFloat(stopLoss);
     const risk = parseFloat(riskPercent);
     const reward = parseFloat(rewardRatio);
+    const vpp = parseFloat(valuePerPoint);
+    const lev = parseFloat(leverage);
 
-    if (isNaN(entryPrice) || isNaN(slPrice) || isNaN(risk) || isNaN(reward) || principal <= 0) {
+    if (
+      isNaN(entryPrice) ||
+      isNaN(slPrice) ||
+      isNaN(risk) ||
+      isNaN(reward) ||
+      isNaN(vpp) ||
+      isNaN(lev) ||
+      principal <= 0
+    ) {
       return null;
     }
 
-    const riskAmount = principal * (risk / 100);
-    const riskPerUnit = Math.abs(entryPrice - slPrice);
+    const slDistance = Math.abs(entryPrice - slPrice);
+    if (slDistance === 0) return null;
 
-    if (riskPerUnit === 0) return null;
+    const riskDollars = principal * (risk / 100);
 
-    let positionSize = riskAmount / riskPerUnit;
+    const positionSizeUnitsRaw = riskDollars / (slDistance * vpp);
+    const positionSizeLotsRaw = positionSizeUnitsRaw / UNITS_PER_LOT;
+    const positionSizeLots = allowFractional ? positionSizeLotsRaw : Math.floor(positionSizeLotsRaw);
+    const finalPositionSizeLots = Math.max(0, positionSizeLots);
+    const finalPositionSizeUnits = finalPositionSizeLots * UNITS_PER_LOT;
 
-    if (!allowFractional) {
-      positionSize = Math.floor(positionSize);
-    }
-
-    const takeProfit = direction === 'long'
-      ? entryPrice + reward * (entryPrice - slPrice)
-      : entryPrice - reward * (slPrice - entryPrice);
-
-    const estimatedPL = direction === 'long'
-      ? (takeProfit - entryPrice) * positionSize
-      : (entryPrice - takeProfit) * positionSize;
+    const marginRequired = (finalPositionSizeUnits * entryPrice) / lev;
+    const tpDistance = slDistance * reward;
+    const takeProfit = direction === 'long' ? entryPrice + tpDistance : entryPrice - tpDistance;
+    const profitDollars = tpDistance * (finalPositionSizeUnits * vpp);
 
     return {
       entry: entryPrice,
       stopLoss: slPrice,
-      positionSize,
+      slDistance,
+      riskDollars,
+      positionSizeUnits: finalPositionSizeUnits,
+      positionSizeLots: finalPositionSizeLots,
+      unitsPerLot: UNITS_PER_LOT,
+      marginRequired,
+      tpDistance,
       takeProfit,
-      estimatedPL,
-      riskAmount,
+      profitDollars,
+      valuePerPoint: vpp,
+      leverage: lev,
     };
   };
 
@@ -73,8 +89,9 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
 
     const tradeData = {
       entry_price: result.entry,
-      quantity: result.positionSize,
-      direction: direction,
+      quantity_lots: result.positionSizeLots,
+      quantity_units: result.positionSizeUnits,
+      direction,
     };
 
     onSendToTradeForm(tradeData);
@@ -101,9 +118,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Input Parameters</h3>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Direction
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Direction</label>
               <div className="flex gap-3">
                 <button
                   onClick={() => setDirection('long')}
@@ -143,9 +158,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Stop Loss ({currency})
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Stop Loss ({currency})</label>
               <input
                 type="number"
                 step="any"
@@ -157,9 +170,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Risk (%)
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Risk (%)</label>
               <input
                 type="number"
                 step="0.1"
@@ -168,15 +179,11 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="2"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Percentage of principal to risk
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Percentage of principal to risk</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Reward:Risk Ratio
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Reward:Risk Ratio (R)</label>
               <input
                 type="number"
                 step="0.1"
@@ -185,15 +192,11 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="2"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Target profit multiplier (e.g., 2 = 2R)
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Target profit multiplier (e.g., 2 = 2R)</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Principal Amount ({currency})
-              </label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Principal Amount ({currency})</label>
               <input
                 type="number"
                 step="any"
@@ -202,9 +205,20 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                 className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="10000"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Account balance from selected account
-              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Account balance from selected account</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Value per point per unit ({currency})</label>
+              <input
+                type="number"
+                step="any"
+                value={valuePerPoint}
+                onChange={(e) => setValuePerPoint(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="1"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">How much one unit moves per 1 point move (default 1)</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -216,7 +230,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                 className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
               />
               <label htmlFor="allow_fractional" className="text-sm text-gray-700 dark:text-gray-300">
-                Allow fractional position size
+                Allow fractional lots
               </label>
             </div>
           </div>
@@ -229,8 +243,9 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                 <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Position Size</p>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {result.positionSize.toFixed(allowFractional ? 4 : 0)} units
+                    {result.positionSizeLots.toFixed(allowFractional ? 4 : 0)} lots
                   </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">({result.positionSizeUnits.toFixed(0)} units)</p>
                 </div>
 
                 <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -246,7 +261,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                     {currency} {result.stopLoss.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Risk: {currency} {result.riskAmount.toFixed(2)} ({riskPercent}%)
+                    Risk: {currency} {result.riskDollars.toFixed(2)} ({riskPercent}%)
                   </p>
                 </div>
 
@@ -255,19 +270,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
                   <p className="text-xl font-semibold text-gray-900 dark:text-white">
                     {currency} {result.takeProfit.toFixed(2)}
                   </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    Estimated P&L: {currency} {result.estimatedPL.toFixed(2)}
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                    <strong>Formulas used:</strong><br />
-                    Risk Amount = Principal × (Risk % ÷ 100)<br />
-                    Risk Per Unit = |Entry - Stop Loss|<br />
-                    Position Size = Risk Amount ÷ Risk Per Unit<br />
-                    Take Profit = Entry ± (Reward Ratio × Risk Per Unit)
-                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Estimated P&L: {currency} {result.profitDollars.toFixed(2)}</p>
                 </div>
 
                 {onSendToTradeForm && (
@@ -282,9 +285,7 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
               </div>
             ) : (
               <div className="text-center py-12">
-                <p className="text-gray-500 dark:text-gray-400">
-                  Fill in all parameters to calculate position size
-                </p>
+                <p className="text-gray-500 dark:text-gray-400">Fill in all parameters to calculate position size</p>
               </div>
             )}
           </div>
@@ -293,3 +294,5 @@ export function CalculatorView({ selectedAccountId, accounts, onSendToTradeForm 
     </div>
   );
 }
+
+export default CalculatorView;
